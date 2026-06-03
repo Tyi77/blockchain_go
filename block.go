@@ -17,6 +17,7 @@ type Block struct {
 }
 
 // Serialize serializes the block
+// 把一個block轉變為bytes，好存進db中
 func (b *Block) Serialize() []byte {
 	var result bytes.Buffer
 	encoder := gob.NewEncoder(&result)
@@ -47,6 +48,7 @@ func NewGenesisBlock() *Block {
 }
 
 // DeserializeBlock deserializes a block
+// 把儲存的byte還原回一個block
 func DeserializeBlock(d []byte) *Block {
 	var block Block
 
