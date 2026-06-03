@@ -21,9 +21,10 @@ type ProofOfWork struct {
 }
 
 // NewProofOfWork builds and returns a ProofOfWork
+// 初始化block和其hash目標。
 func NewProofOfWork(b *Block) *ProofOfWork {
 	target := big.NewInt(1)
-	target.Lsh(target, uint(256-targetBits))
+	target.Lsh(target, uint(256-targetBits)) // 目標為算出來的hash要小於這個值。targetBits越小，此target越大，也代表越容易達標。
 
 	pow := &ProofOfWork{b, target}
 
@@ -46,6 +47,7 @@ func (pow *ProofOfWork) prepareData(nonce int) []byte {
 }
 
 // Run performs a proof-of-work
+// POW 的進入點 (called by Newblock() in block.go)
 func (pow *ProofOfWork) Run() (int, []byte) {
 	var hashInt big.Int
 	var hash [32]byte
