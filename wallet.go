@@ -6,12 +6,15 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/sha256"
+	"encoding/gob"
 	"log"
+	"math/big"
 
 	"golang.org/x/crypto/ripemd160"
 )
 
 const version = byte(0x00)
+const walletFile = "wallet.dat"
 const addressChecksumLen = 4
 
 // Wallet stores private and public keys
@@ -26,6 +29,47 @@ func NewWallet() *Wallet {
 	wallet := Wallet{private, public}
 
 	return &wallet
+}
+
+// walletData is used to serialize wallet since ecdsa.PrivateKey cannot be serialized natively by gob
+type walletData struct {
+	PrivateKeyD []byte
+	PrivateKeyX []byte
+	PrivateKeyY []byte
+	PublicKey   []byte
+}
+
+// GobEncode implements the gob.GobEncoder interface
+func (w Wallet) GobEncode() ([]byte, error) {
+	wd := walletData{
+		PrivateKeyD: w.PrivateKey.D.Bytes(),
+		PrivateKeyX: w.PrivateKey.X.Bytes(),
+		PrivateKeyY: w.PrivateKey.Y.Bytes(),
+		PublicKey:   w.PublicKey,
+	}
+	var buf bytes.Buffer
+	enc := gob.NewEncoder(&buf)
+	err := enc.Encode(wd)
+	if err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+// GobDecode implements the gob.GobDecoder interface
+func (w *Wallet) GobDecode(data []byte) error {
+	var wd walletData
+	dec := gob.NewDecoder(bytes.NewReader(data))
+	err := dec.Decode(&wd)
+	if err != nil {
+		return err
+	}
+	w.PublicKey = wd.PublicKey
+	w.PrivateKey.Curve = elliptic.P256()
+	w.PrivateKey.D = new(big.Int).SetBytes(wd.PrivateKeyD)
+	w.PrivateKey.X = new(big.Int).SetBytes(wd.PrivateKeyX)
+	w.PrivateKey.Y = new(big.Int).SetBytes(wd.PrivateKeyY)
+	return nil
 }
 
 // GetAddress returns wallet address
