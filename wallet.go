@@ -2,12 +2,10 @@ package main
 
 import (
 	"bytes"
-	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/rand"
-	"crypto/sha256"
+	"crypto/sha512"
 	"log"
 
+	"github.com/cloudflare/circl/sign/mldsa/mldsa65"
 	"golang.org/x/crypto/ripemd160"
 )
 
@@ -16,7 +14,7 @@ const addressChecksumLen = 4
 
 // Wallet stores private and public keys
 type Wallet struct {
-	PrivateKey ecdsa.PrivateKey
+	PrivateKey []byte
 	PublicKey  []byte
 }
 
@@ -43,10 +41,10 @@ func (w Wallet) GetAddress() []byte {
 
 // HashPubKey hashes public key
 func HashPubKey(pubKey []byte) []byte {
-	publicSHA256 := sha256.Sum256(pubKey)
+	publicSHA384 := sha512.Sum384(pubKey)
 
 	RIPEMD160Hasher := ripemd160.New()
-	_, err := RIPEMD160Hasher.Write(publicSHA256[:])
+	_, err := RIPEMD160Hasher.Write(publicSHA384[:])
 	if err != nil {
 		log.Panic(err)
 	}
@@ -68,19 +66,16 @@ func ValidateAddress(address string) bool {
 
 // Checksum generates a checksum for a public key
 func checksum(payload []byte) []byte {
-	firstSHA := sha256.Sum256(payload)
-	secondSHA := sha256.Sum256(firstSHA[:])
+	firstSHA := sha512.Sum384(payload)
+	secondSHA := sha512.Sum384(firstSHA[:])
 
 	return secondSHA[:addressChecksumLen]
 }
 
-func newKeyPair() (ecdsa.PrivateKey, []byte) {
-	curve := elliptic.P256()
-	private, err := ecdsa.GenerateKey(curve, rand.Reader)
+func newKeyPair() ([]byte, []byte) {
+	pk, sk, err := mldsa65.GenerateKey(nil)
 	if err != nil {
 		log.Panic(err)
 	}
-	pubKey := append(private.PublicKey.X.Bytes(), private.PublicKey.Y.Bytes()...)
-
-	return *private, pubKey
+	return sk.Bytes(), pk.Bytes()
 }

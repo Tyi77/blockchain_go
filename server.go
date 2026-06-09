@@ -107,7 +107,7 @@ func sendBlock(addr string, b *Block) {
 }
 
 func sendData(addr string, data []byte) {
-	conn, err := net.Dial(protocol, addr)
+	conn, err := SecureDial(protocol, addr)
 	if err != nil {
 		fmt.Printf("%s is not available\n", addr)
 		var updatedNodes []string
@@ -438,7 +438,15 @@ func StartServer(nodeID, minerAddress string) {
 		if err != nil {
 			log.Panic(err)
 		}
-		go handleConnection(conn, bc)
+		
+		secConn, err := SecureAccept(conn)
+		if err != nil {
+			log.Printf("SecureAccept error: %v", err)
+			conn.Close()
+			continue
+		}
+		
+		go handleConnection(secConn, bc)
 	}
 }
 

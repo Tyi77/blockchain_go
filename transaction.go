@@ -2,17 +2,15 @@ package main
 
 import (
 	"bytes"
-	"crypto/ecdsa"
-	"crypto/elliptic"
 	"crypto/rand"
-	"crypto/sha256"
-	"math/big"
-	"strings"
-
+	"crypto/sha512"
 	"encoding/gob"
 	"encoding/hex"
 	"fmt"
 	"log"
+	"strings"
+
+	"github.com/cloudflare/circl/sign/mldsa/mldsa65"
 )
 
 const subsidy = 10
@@ -44,18 +42,18 @@ func (tx Transaction) Serialize() []byte {
 
 // Hash returns the hash of the Transaction
 func (tx *Transaction) Hash() []byte {
-	var hash [32]byte
+	var hash [48]byte
 
 	txCopy := *tx
 	txCopy.ID = []byte{}
 
-	hash = sha256.Sum256(txCopy.Serialize())
+	hash = sha512.Sum384(txCopy.Serialize())
 
 	return hash[:]
 }
 
 // Sign signs each input of a Transaction
-func (tx *Transaction) Sign(privKey ecdsa.PrivateKey, prevTXs map[string]Transaction) {
+func (tx *Transaction) Sign(privKey []byte, prevTXs map[string]Transaction) {
 	if tx.IsCoinbase() {
 		return
 	}
@@ -75,11 +73,16 @@ func (tx *Transaction) Sign(privKey ecdsa.PrivateKey, prevTXs map[string]Transac
 
 		dataToSign := fmt.Sprintf("%x\n", txCopy)
 
-		r, s, err := ecdsa.Sign(rand.Reader, &privKey, []byte(dataToSign))
+		var sk mldsa65.PrivateKey
+		err := sk.UnmarshalBinary(privKey)
 		if err != nil {
 			log.Panic(err)
 		}
-		signature := append(r.Bytes(), s.Bytes()...)
+
+		signature, err := sk.Sign(nil, []byte(dataToSign), nil)
+		if err != nil {
+			log.Panic(err)
+		}
 
 		tx.Vin[inID].Signature = signature
 		txCopy.Vin[inID].PubKey = nil
@@ -141,29 +144,21 @@ func (tx *Transaction) Verify(prevTXs map[string]Transaction) bool {
 	}
 
 	txCopy := tx.TrimmedCopy()
-	curve := elliptic.P256()
 
 	for inID, vin := range tx.Vin {
 		prevTx := prevTXs[hex.EncodeToString(vin.Txid)]
 		txCopy.Vin[inID].Signature = nil
 		txCopy.Vin[inID].PubKey = prevTx.Vout[vin.Vout].PubKeyHash
 
-		r := big.Int{}
-		s := big.Int{}
-		sigLen := len(vin.Signature)
-		r.SetBytes(vin.Signature[:(sigLen / 2)])
-		s.SetBytes(vin.Signature[(sigLen / 2):])
-
-		x := big.Int{}
-		y := big.Int{}
-		keyLen := len(vin.PubKey)
-		x.SetBytes(vin.PubKey[:(keyLen / 2)])
-		y.SetBytes(vin.PubKey[(keyLen / 2):])
-
 		dataToVerify := fmt.Sprintf("%x\n", txCopy)
 
-		rawPubKey := ecdsa.PublicKey{curve, &x, &y}
-		if ecdsa.Verify(&rawPubKey, []byte(dataToVerify), &r, &s) == false {
+		var pk mldsa65.PublicKey
+		err := pk.UnmarshalBinary(vin.PubKey)
+		if err != nil {
+			return false
+		}
+
+		if mldsa65.Verify(&pk, []byte(dataToVerify), nil, vin.Signature) == false {
 			return false
 		}
 		txCopy.Vin[inID].PubKey = nil

@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"crypto/ecdsa"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -318,7 +317,7 @@ func (bc *Blockchain) MineBlock(transactions []*Transaction) *Block {
 }
 
 // SignTransaction signs inputs of a Transaction
-func (bc *Blockchain) SignTransaction(tx *Transaction, privKey ecdsa.PrivateKey) {
+func (bc *Blockchain) SignTransaction(tx *Transaction, privKey []byte) {
 	prevTXs := make(map[string]Transaction)
 
 	for _, vin := range tx.Vin {
