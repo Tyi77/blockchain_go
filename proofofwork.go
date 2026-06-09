@@ -2,7 +2,7 @@ package main
 
 import (
 	"bytes"
-	"crypto/sha256"
+	"crypto/sha512"
 	"fmt"
 	"math"
 	"math/big"
@@ -23,7 +23,7 @@ type ProofOfWork struct {
 // NewProofOfWork builds and returns a ProofOfWork
 func NewProofOfWork(b *Block) *ProofOfWork {
 	target := big.NewInt(1)
-	target.Lsh(target, uint(256-targetBits))
+	target.Lsh(target, uint(384-targetBits))
 
 	pow := &ProofOfWork{b, target}
 
@@ -48,17 +48,15 @@ func (pow *ProofOfWork) prepareData(nonce int) []byte {
 // Run performs a proof-of-work
 func (pow *ProofOfWork) Run() (int, []byte) {
 	var hashInt big.Int
-	var hash [32]byte
+	var hash [48]byte
 	nonce := 0
 
 	fmt.Printf("Mining a new block")
 	for nonce < maxNonce {
 		data := pow.prepareData(nonce)
 
-		hash = sha256.Sum256(data)
-		if math.Remainder(float64(nonce), 100000) == 0 {
-			fmt.Printf("\r%x", hash)
-		}
+		hash = sha512.Sum384(data)
+		fmt.Printf("\r%x", hash)
 		hashInt.SetBytes(hash[:])
 
 		if hashInt.Cmp(pow.target) == -1 {
@@ -77,7 +75,7 @@ func (pow *ProofOfWork) Validate() bool {
 	var hashInt big.Int
 
 	data := pow.prepareData(pow.block.Nonce)
-	hash := sha256.Sum256(data)
+	hash := sha512.Sum384(data)
 	hashInt.SetBytes(hash[:])
 
 	isValid := hashInt.Cmp(pow.target) == -1

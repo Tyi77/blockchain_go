@@ -1,2 +1,7 @@
 *.db
 *.dat
+cli.txt
+go.mod
+go.sum
+bc
+blockchain_go
